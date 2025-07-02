@@ -1,0 +1,18 @@
+# חסום את כל מנועי החיפוש מכל סריקה או אינדוקס
+User-agent: *
+Disallow: /
+
+# חסום את Googlebot
+User-agent: Googlebot
+Disallow: /
+
+# חסום את Bing
+User-agent: Bingbot
+Disallow: /
+
+# חסום את Facebook ו-Twitter
+User-agent: facebookexternalhit
+Disallow: /
+
+User-agent: Twitterbot
+Disallow: /
