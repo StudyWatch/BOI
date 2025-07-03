@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { toast } from '@/hooks/use-toast'
 import { supabase } from '@/integrations/supabase/client'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -197,13 +197,18 @@ export const EmployeeShiftSelector: React.FC<{
   selectedMonth: Date
   onUpdateEmployee: (updated: Employee) => Promise<void> | void
   isDarkMode?: boolean
+  isAdminBoard?: boolean // <<< הוסף כאן! 
 }> = ({
   employees,
   selectedMonth: currentMonth,
   onUpdateEmployee,
-  isDarkMode = false
+  isDarkMode = false,
+  isAdminBoard = false // <<< ברירת מחדל
 }) => {
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee>(employees[0])
+  // התנאי עושה כניסה אוטומטית לעובד רק אם זה לא לוח סדרן ויש רק אחד:
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+    !isAdminBoard && employees.length === 1 ? employees[0] : null
+  )
   const [preferences, setPreferences] = useState<Record<string, DayPreferences>>({})
   const [userPreferences, setUserPreferences] = useState<UserPreferences>({ preferredShifts: [], avoidedShifts: [], notes: '' })
   const [activeTab, setActiveTab] = useState<'schedule' | 'summary' | 'constraints' | 'preferences'>('schedule')
@@ -215,6 +220,7 @@ export const EmployeeShiftSelector: React.FC<{
   const dayRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
   useEffect(() => {
+    if (!selectedEmployee) return
     setUserPreferences(selectedEmployee.userPreferences || { preferredShifts: [], avoidedShifts: [], notes: '' })
     const fetchDailyPrefs = async () => {
       const { data, error } = await supabase
@@ -309,7 +315,7 @@ export const EmployeeShiftSelector: React.FC<{
 
   const validateAndSave = async (newPrefs: Record<string, DayPreferences>) => {
     setPreferences(newPrefs)
-    onUpdateEmployee({ ...selectedEmployee, preferences: newPrefs, userPreferences })
+    onUpdateEmployee({ ...selectedEmployee!, preferences: newPrefs, userPreferences })
     try {
       await Promise.all(
         Object.entries(newPrefs).map(([dateKey, dp]) => upsertDay(dateKey, dp))
@@ -419,7 +425,7 @@ export const EmployeeShiftSelector: React.FC<{
 
   const handleUserPreferencesUpdate = (up: UserPreferences) => {
     setUserPreferences(up)
-    onUpdateEmployee({ ...selectedEmployee, userPreferences: up })
+    onUpdateEmployee({ ...selectedEmployee!, userPreferences: up })
   }
 
   const renderDay = (day: Date) => {
@@ -561,6 +567,42 @@ export const EmployeeShiftSelector: React.FC<{
     )
   }
 
+  // ---------------- תצוגת בחירת עובד ----------------
+  if (!selectedEmployee) {
+    return (
+      <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className="container mx-auto p-3 sm:p-8 max-w-7xl">
+          <Card className={`mb-4 ${isDarkMode ? 'bg-gray-800 border-gray-600' : ''}`}>
+            <CardHeader className="pb-3 sm:pb-4">
+              <CardTitle className={`text-lg sm:text-xl ${isDarkMode ? 'text-white' : ''}`}>
+                בחר עובד
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {employees.map(emp => (
+                  <Button
+                    key={emp.id}
+                    variant="outline"
+                    onClick={() => setSelectedEmployee(emp)}
+                    className="p-4 h-auto flex flex-col items-start"
+                  >
+                    <div className="font-semibold">{emp.name}</div>
+                    <div className="text-sm text-gray-500">{emp.role}</div>
+                    {emp.funnyTitle && (
+                      <div className="text-xs text-gray-400">{emp.funnyTitle}</div>
+                    )}
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // --------------- המשך רינדור הלוח כרגיל ---------------
   return (
     <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
       <WeeklyStatsFloating
@@ -611,6 +653,14 @@ export const EmployeeShiftSelector: React.FC<{
                 >
                   <Copy className="h-4 w-4 mr-1" />
                   העתק חודש קודם
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedEmployee(null)}
+                  className="h-9 flex-1 sm:flex-none"
+                >
+                  ← חזור לבחירת עובד
                 </Button>
               </div>
             </div>
